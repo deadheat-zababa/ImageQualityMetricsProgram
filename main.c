@@ -79,8 +79,8 @@ int main(int argc,char **argv){
            compress_rgba = (unsigned int*)malloc(sizeof(unsigned int)*WIDTH*HEIGHT);
            original_rgb = (unsigned char*)malloc(sizeof(unsigned char)*WIDTH*file_info.height*3);
            compress_rgb = (unsigned char*)malloc(sizeof(unsigned char)*WIDTH*file_info.height*3);
-           y_before = (uint8_t **)malloc(sizeof(uint8_t)*HEIGHT);
-           y_after = (uint8_t **)malloc(sizeof(uint8_t)*HEIGHT);
+           y_before = (uint8_t **)malloc(sizeof(uint8_t *)*HEIGHT);
+           y_after = (uint8_t **)malloc(sizeof(uint8_t *)*HEIGHT);
            for(i=0;i<HEIGHT;i++){
                y_before[i] = (uint8_t *)malloc(sizeof(uint8_t)*WIDTH);
                y_after[i] = (uint8_t *)malloc(sizeof(uint8_t)*WIDTH);
@@ -92,24 +92,25 @@ int main(int argc,char **argv){
 
        if(orignal_rgba==NULL||comparison_rgba==NULL){
             printf("rgba error\n");
-            TIFFClose(tiff1);
-            TIFFClose(tiff2);
+            TIFFClose(original_tiff);
+            TIFFClose(compress_tiff2);
             eixt(1);
         }
 
-        if(!TIFFReadRGBAImage(tiff1,WIDTH, HEIGHT, original_rgba, 0)){
+        if((!TIFFReadRGBAImage(orifinal_tiff,WIDTH, HEIGHT, original_rgba, 0))||
+	   (!TIFFReadRGBAImage(compress_tiff,WIDTH, HEIGHT, original_rgba, 0))){
             printf("TIFFReadRGBAImage error\n");
             free(original_rgb);
-	        free(compress_rgb);
-            TIFFClose(tiff1);
-            TIFFClose(tiff2);
+	    free(compress_rgb);
+            TIFFClose(original_tiff);
+            TIFFClose(compress_tiff2);
             eixt(1);
         }
 
         TIFFClose(original_tiff);
         TIFFClose(compress_tiff);
 
-         if(original_rgb==NULL||compress_rgb==NULL){
+        if(original_rgb==NULL||compress_rgb==NULL){
         printf("malloc rgb error\n");
         free(original_rgba);
         free(compress_rgba);
@@ -159,9 +160,9 @@ int main(int argc,char **argv){
     free(y_before);
     free(y_after);
     free(original_rgba);
-    free(comparison_rgba);
+    free(compress_rgba);
     free(original_rgb);
-    free(comparison_rgb);    
+    free(compress_rgb);    
     free(fp_before);
     free(fp_after);
     free(fp_write);
