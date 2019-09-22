@@ -1,170 +1,202 @@
 #include<stdio.h>
-#include"iqa.h"
+#include<stdlib.h>
+#include<getopt.h>
+#include<math.h>
+#include<stdint.h>
+#include<string.h>
+#include<string.h>
+#include<tiffio.h>
+#include<omp.h>
+#include<pthread.h>
+#include"processing.h"
 
-init(unsigned int original_rgba,unsigned int compress_rgba,
-    unsigned char original_rgb,unsigned char compress_rgb,
-    unsigned char **original_y,unsigned char **compress_y,
-    int HEIGHT,int WIDTH){
+void setOptionDefault(optinfo *info){
+ info->input1_name=NULL;
+ info->input2_name=NULL;
+ info->output_name = NULL;
+ info->width = 3840;
+ info->height = 2160;
+ info->format = NULL; 
+ info->frame_number = 1;
+ info->start_number = 0;
+ info->psnr_flag = 0;
+ info->ssim_flag = 0;
+ info->show_flag = 1;
+ info->mode = 3;
+ info->thread_number = 0;
+ info->psnr_value = NULL;
+ info->ssim_value = NULL;
+}
 
-    memset(original_rgba,0,sizeof(unsigned int)*HEIGHT*WIDTH);
-    memset(compress_rgba,0,sizeof(unsigned int)*HEIGHT*WIDTH);
-    memset(original_rgb,0,sizeof(unsigned char)*HEIGHT*WIDTH*3);
-    memset(compress_rgb,0,sizeof(unsigned char)*HEIGHT*WIDTH*3);
-    memset(y_before[0][0],0,sizeof(uint8_t)*HEIGHT*WIDTH);
-    memset(y_after[0][0],0,sizeof(uint8_t)*HEIGHT*WIDTH);
+int setOption(int argc,char **argv,optinfo *info){
+ int opt;
+ char a=0;
+ setOptionDefault(info);
+ 
+ while((opt = getopt(argc,argv,"i:n:o:f:s:m:p:v:"))!= -1){
+  switch(opt){
+   case 'i':
+    printf("-i %s\n",optarg);
+    if(a==0){
+     info->input1_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg));
+     memcpy(info->input1_name,optarg,sizeof(unsigned char)*strlen(optarg));
+    }
+    else if(a==1){
+     info->input2_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg));
+     memcpy(info->input2_name,optarg,sizeof(unsigned char)*strlen(optarg));
+    }
+    a++;
+   break;
+   
+   case 'n':
+    info->frame_number = atoi(optarg);
+    printf("-n %d\n",info->frame_number);
+   break;
+
+   case 'o':
+    info->output_name = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(optarg)+4+strlen("\0")));
+    sprintf(info->output_name,"%s.csv",optarg);
+    printf("-o %s\n",info->output_name);
+   break;
+   
+   case 'f':
+    //printf();
+   break;
+
+   case 's':
+    info->start_number = atoi(optarg);
+    printf("-s %d\n",atoi(optarg));
+   break;
+
+   case 'm':
+    printf("-m mode\n m=1:psnr only\n m=2:ssim only\n m=3 between psnr and ssim\n");
+    info->mode = atoi(optarg);
+    printf("mode:%d\n",info->mode);
+   break;
+
+   case 'p':
+    info->thread_number = atoi(optarg);
+    printf("therad number:%d\n",info->thread_number);
+   break;
+   case 'v':
+    info->show_flag = atoi(optarg);
+    if(info->show_flag > 1){
+      info->show_flag=1;
+    }
+    printf("show:%d\n",info->show_flag);
+   break;
+
+   default:
+    printf("not option\n");
+    break;
+   
+  }
+ }
+ return 0; 
 }
 
 
+
 int main(int argc,char **argv){
-    int WIDTH;
-    int HEIGHT;
-    unsigned char file_before[512];
-    unsigned char file_after[512];
-    FILE *fp_before;
-    FILE *fp_after;
-    FILE fp_write;
-    unsigned char connect[2] = "_";			// ファイル名調整用変数
-	unsigned char tiff[6] = ".tiff";
-	unsigned char csv[5] = ".csv";
-    unsigned char count_string[512];
-    TIFF *orignal_tiff;
-    TIFF *compress_tiff;
-    unsigned int *original_rgba;
-    unsigned int *compress_rgba;
-    unsigned char *original_rgb;
-    unsigned char *compress_rgb;
+ optinfo info;
+ int i; 
+ double average_psnr;
+ double average_ssim;
+ unsigned char *name1;
+ unsigned char *name2;
 
-    uint8_t **y_before;
-    uint8_t **y_before;
-    float fPSNR
-    float psnr_sum;
-    float fSSIM;
-    float ssim_sum;
+ if(argc<=3){
+  printf("Error\n");
+  printf("Usage:program.exe -i inputfile -i inputfile -f tiff\n");
+  fflush(stdout);
+  exit(1);  
+ }
 
-    file_before[512] = argv[1];
-    file_after[512] = argv[2];
-    FRAME = atoi(argv[3]);
+ if(setOption(argc,argv,&info)==-1) exit(1);
+ fflush(stdout);
+ 
+ info.psnr_value = (double*)malloc(sizeof(double)*(info.frame_number+1));
+ info.ssim_value = (double *)malloc(sizeof(double)*(info.frame_number+1));
+ 
+
+ if(info.output_name==NULL){
+  name1 = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(info.input1_name)));
+  name2 = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(info.input2_name)));
+  name1 = strstr(info.input1_name,"/")+1;
+  name2 = strstr(info.input2_name,"/")+1;
+  info.output_name = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(name1)+strlen(name2)+7));
+  sprintf(info.output_name,"%sand%s.csv",name1,name2);
+  if((info.outfile=fopen(info.output_name,"a"))==NULL) printf("EEOR\n");
+  fflush(stdout);
+  fprintf(info.outfile,"count,psnr,ssim,\n");
+  free(name1);
+  free(name2);
+ }
+
+ if((info.outfile=fopen(info.output_name,"a"))==NULL) printf("ERROR\n");
+ fflush(stdout);
+ if(info.mode==1){
+  fprintf(info.outfile,"count,psnr\n");
+ }
+ else if(info.mode ==2){
+   fprintf(info.outfile,"count,ssim,\n");
+ }
+ else if(info.mode ==3){
+  fprintf(info.outfile,"count,psnr,ssim,\n");
+ }
+ pthread_t *pt;
+ pthread_t tmp_pt;
+ pt = (pthread_t*)malloc(sizeof(pthread_t)*info.thread_number);
+ pthread_mutex_init(&info.mutex,NULL);
+
+ if(info.frame_number>=60){
+  if(info.thread_number==0)info.thread_number = 60;
+  for(i=0;i<info.thread_number;i++){
+   if(pthread_create(&pt[i],NULL,(void*)tiff_psnr_ssim,&info)<0){
+    printf("pthread_create error\n");
+    exit(1);
+   }
+  }
+ }
+ else{
+  tiff_psnr_ssim(&info);
+ }
+
+/*
+ if(info.format == "yuv") yuv_psnr_ssim();
+ else if(info.format == "tiff") tiff_psnr_ssim(&info);
+ else if(info.format =="bmp") bmp_psnr_ssim();
+*/
+
+if(info.frame_number>=60){
+ for(i=0;i<info.thread_number;i++){
+  tmp_pt = pt[i];
+  pthread_join(tmp_pt, NULL);
+ }
+}
+
+for(i=0;i<info.frame_number;i++){
+ if(info.mode == 1) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.psnr_value[i]);
+ if(info.mode == 2) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.ssim_value[i]);
+ if(info.mode == 3) fprintf(info.outfile,"%d FRAME,%lf,%lf,\n",i,info.psnr_value[i],info.ssim_value[i]);
+}
+
+if(info.mode == 1 ||info.mode ==3) average_psnr = (info.psnr_value[info.frame_number]/info.frame_number);
+if(info.mode == 2 ||info.mode ==3) average_ssim = (info.ssim_value[info.frame_number]/info.frame_number);
     
-    sprintf(fp_write,"%sと%s%s", argv[1] , argv[2] , csv);// 結果を書き込むファイル名の設定
-    
-    if((fp_write = fopen(file_write,"a"))==NULL){
-            printf("Cant't Create image_write FILE");
-            exit(1);
-    }
+ fprintf(info.outfile,"\n");
+ if(info.mode == 1 ||info.mode ==3){
+  fprintf(info.outfile,"SUM(PSNR),%lf,\n",info.psnr_value[info.frame_number]);
+  fprintf(info.outfile,"AVE(PSNR),%lf,\n",average_psnr);
+ }
+ if(info.mode == 2 ||info.mode ==3){
+  fprintf(info.outfile,"SUM(SSIM),%lf,\n",info.ssim_value[info.frame_number]);
+  fprintf(info.outfile,"AVE(SSIM),%lf,\n",average_ssim);
+ }
 
-    fprintf(fp_write,"回数,PSNR,SSIM, \n"); // 出力 ⇒ 横並び:「"%lf, "」	縦並び:「"%lf, \n"」
-
-    for(count=0;count<FRAME;count++){
-        sprintf(count_string,"%d",count+1);							// 整数を文字列として配列に格納する
-		strcat(file_before , argv[1]);			// 例）ex1
-		strcat(file_before , connect);			// 例）ex1_
-		strcat(file_before , count_string);		// 例）ex1_1
-		strcat(file_before , tiff);			// 例）ex1_1.bmp
-
-		strcat(file_after , argv[2]);
-		strcat(file_after , connect);
-		strcat(file_after , count_string);
-		strcat(file_after , tiff);
-
-        if(((original_tiff = TIFFOpen(file_before,"rb"))||(compress_tiff = TIFFOpen(file_after,"rb")))==NULL){
-            printf("Cant't Open image FILE");
-            exit(1);
-        }
-
-       /*get width&height*/
-       if(count==0){
-           if(!TIFFGetField(original_tiff,TIFFTAG_IMAGELENGTH,HEIGHT)) printf("TIFFGetField height error\n");
-           if(!TIFFGetField(original_tiff,TIFFTAG_IMAGEWIDTH,WIDTH)) printf("TIFFGetField width error\n");
-           original_rgba = (unsigned int*)malloc(sizeof(unsigned int)*WIDTH*HEIGHT);
-           compress_rgba = (unsigned int*)malloc(sizeof(unsigned int)*WIDTH*HEIGHT);
-           original_rgb = (unsigned char*)malloc(sizeof(unsigned char)*WIDTH*file_info.height*3);
-           compress_rgb = (unsigned char*)malloc(sizeof(unsigned char)*WIDTH*file_info.height*3);
-           y_before = (uint8_t **)malloc(sizeof(uint8_t *)*HEIGHT);
-           y_after = (uint8_t **)malloc(sizeof(uint8_t *)*HEIGHT);
-           for(i=0;i<HEIGHT;i++){
-               y_before[i] = (uint8_t *)malloc(sizeof(uint8_t)*WIDTH);
-               y_after[i] = (uint8_t *)malloc(sizeof(uint8_t)*WIDTH);
-           }
-       }
-       /*-----------------------------------------------------------------------------------------*/
-
-       init(original_rgba,compress_rgba,original_rgb,compress_rgb,y_before,y_before,HEIGHT,WIDTH);
-
-       if(orignal_rgba==NULL||comparison_rgba==NULL){
-            printf("rgba error\n");
-            TIFFClose(original_tiff);
-            TIFFClose(compress_tiff2);
-            eixt(1);
-        }
-
-        if((!TIFFReadRGBAImage(orifinal_tiff,WIDTH, HEIGHT, original_rgba, 0))||
-	   (!TIFFReadRGBAImage(compress_tiff,WIDTH, HEIGHT, original_rgba, 0))){
-            printf("TIFFReadRGBAImage error\n");
-            free(original_rgb);
-	    free(compress_rgb);
-            TIFFClose(original_tiff);
-            TIFFClose(compress_tiff2);
-            eixt(1);
-        }
-
-        TIFFClose(original_tiff);
-        TIFFClose(compress_tiff);
-
-        if(original_rgb==NULL||compress_rgb==NULL){
-        printf("malloc rgb error\n");
-        free(original_rgba);
-        free(compress_rgba);
-        return -1;
-    }
-
-        for(j = 0; j < HEIGHT; j++){
-            for(i = 0; i < WIDTH; i++){
-                original_rgb[3 * (i + j * WIDTH) + 0] = TIFFGetR(rgbaData[i + (HEIGHT - 1 - j) * width]);
-                original_rgb[3 * (i + j * WIDTH) + 1] = TIFFGetG(rgbaData[i + (HEIGHT - 1 - j) * width]);
-                original_rgb[3 * (i + j * WIDTH) + 2] = TIFFGetB(rgbaData[i + (HEIGHT - 1 - j) * width]);
-                compress_rgb[3 * (i + j * WIDTH) + 0] = TIFFGetR(rgbaData[i + (HEIGHT - 1 - j) * width]);
-                compress_rgb[3 * (i + j * WIDTH) + 1] = TIFFGetG(rgbaData[i + (HEIGHT - 1 - j) * width]);
-                compress_rgb[3 * (i + j * WIDTH) + 2] = TIFFGetB(rgbaData[i + (HEIGHT - 1 - j) * width]);
-            }
-        }
-
-        for(i=0;i<HEIGHT;i++){
-            for(j=0;j<WIDTH;j++){
-                y_before[i][j] = 0.299 * (*original_rgb) +
-					        0.587 * (*(original_rgb++)) +
-					        0.114 * (*(original_rgb++));
-
-                y_after[i][j] = 0.299 * (*compress_rgb) +
-					        0.587 * (*(compress_rgb++)) +
-					        0.114 * (*(compress_rgb++));
-                original_rgb++;
-                compress_rgb++;
-            }
-        }
-
-        fPSNR = psnr(y_before,y_after,WIDTH,HEIGHT);
-        fSSIM = ssim(y_before,y_after,WIDTH,HEIGHT);
-        cFRAME = frame(fPSNR,fSSIM);
-        sum_psnr += fPSNR;
-        sum_ssim += fSSIM;
-        /*ファイル書き込み*/
-        fprintf(fp_write,"%d,%f,%f, \n",count,fPSNR,fSSIM,cFRAME);
-    }
-
-
-    /*メモリの開放*/
-    for(i=0;i<HEIGHT;i++) {
-        free(y_before[i]);
-        free(y_after[i]);
-    }
-    free(y_before);
-    free(y_after);
-    free(original_rgba);
-    free(compress_rgba);
-    free(original_rgb);
-    free(compress_rgb);    
-    free(fp_before);
-    free(fp_after);
-    free(fp_write);
-    return 0;
+ pthread_mutex_destroy(&info.mutex);
+ fclose(info.outfile);
+ 
+ printf("end\n");
+ return 0;
 }
