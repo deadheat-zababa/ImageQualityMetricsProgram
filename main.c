@@ -6,9 +6,14 @@
 #include<string.h>
 #include<string.h>
 #include<tiffio.h>
-#include<omp.h>
+#include<openacc.h>
 #include<pthread.h>
 #include"processing.h"
+
+
+#define _FILE_OFFSET_BITS 64
+#define _LARGEFILE_SOURCE
+//pthread_mutex_t mutex;
 
 void setOptionDefault(optinfo *info){
  info->input1_name=NULL;
@@ -16,14 +21,15 @@ void setOptionDefault(optinfo *info){
  info->output_name = NULL;
  info->width = 3840;
  info->height = 2160;
- info->format = NULL; 
+ info->format = 1; 
  info->frame_number = 1;
  info->start_number = 0;
+ info->thread_id = 0;
  info->psnr_flag = 0;
  info->ssim_flag = 0;
  info->show_flag = 1;
  info->mode = 3;
- info->thread_number = 0;
+ info->thread_number = 10;
  info->psnr_value = NULL;
  info->ssim_value = NULL;
 }
@@ -38,11 +44,11 @@ int setOption(int argc,char **argv,optinfo *info){
    case 'i':
     printf("-i %s\n",optarg);
     if(a==0){
-     info->input1_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg));
+     info->input1_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg)+1);
      memcpy(info->input1_name,optarg,sizeof(unsigned char)*strlen(optarg));
     }
     else if(a==1){
-     info->input2_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg));
+     info->input2_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg)+1);
      memcpy(info->input2_name,optarg,sizeof(unsigned char)*strlen(optarg));
     }
     a++;
@@ -60,7 +66,9 @@ int setOption(int argc,char **argv,optinfo *info){
    break;
    
    case 'f':
-    //printf();
+    if(strcmp("yuv",optarg)==0) info->format = 0;
+    else if(strcmp("tiff",optarg)==0) info->format = 1;
+    printf("format\n");
    break;
 
    case 's':
@@ -86,6 +94,11 @@ int setOption(int argc,char **argv,optinfo *info){
     printf("show:%d\n",info->show_flag);
    break;
 
+   case 'h':
+    printf("ganbarimasu\n");
+    exit(1);
+    break;
+
    default:
     printf("not option\n");
     break;
@@ -94,8 +107,52 @@ int setOption(int argc,char **argv,optinfo *info){
  }
  return 0; 
 }
+unsigned long getSize(FILE *fp){
+ unsigned long size;
+ fseek(fp,0,SEEK_END);
+ size = ftell(fp);
+ fseek(fp,0,SEEK_SET);
+ return size;
+}
 
 
+void openyuvimg(optinfo *info){
+ FILE *before_file;
+ FILE *after_file;
+ unsigned char *before_img;
+ unsigned char *after_img;
+ unsigned long before_size;
+ unsigned long after_size;
+ int ret;
+ 
+ before_file = fopen(info->input1_name,"rb");
+ before_size = getSize(before_file);
+ before_img = (unsigned char*)malloc(sizeof(unsigned char)*(before_size));
+ ret = fread(before_img,before_size,1,before_file);
+ free(info->input1_name);
+
+ if((after_file=fopen(info->input2_name,"rb"))==NULL){
+  perror("print error ");
+  printf("after file read error\n");
+  fflush(stdout);
+ }
+
+ after_size = getSize(after_file);
+ after_img = (unsigned char*)malloc(sizeof(unsigned char)*(after_size));
+ ret = fread(after_img,after_size,1,after_file);
+ free(info->input2_name);
+
+ if(before_size != after_size) printf("you are fool\n"); 
+ printf("before_size:%ld,after_size:%ld\n",before_size,after_size);
+ printf("width:%d,height:%d\n",info->width,info->height);
+ info->frame_number= (before_size/(info->width*info->height*3))<<1;
+ printf("info->frame_number:%d\n",info->frame_number);
+
+ info->input1_name = before_img;
+ info->input2_name = after_img;
+ fclose(before_file);
+ fclose(after_file);
+}
 
 int main(int argc,char **argv){
  optinfo info;
@@ -105,6 +162,7 @@ int main(int argc,char **argv){
  unsigned char *name1;
  unsigned char *name2;
 
+  printf("number of device:%d\n",acc_get_num_devices(acc_device_nvidia));
  if(argc<=3){
   printf("Error\n");
   printf("Usage:program.exe -i inputfile -i inputfile -f tiff\n");
@@ -149,31 +207,41 @@ int main(int argc,char **argv){
  pt = (pthread_t*)malloc(sizeof(pthread_t)*info.thread_number);
  pthread_mutex_init(&info.mutex,NULL);
 
+ if(info.format == 0) openyuvimg(&info);
  if(info.frame_number>=60){
-  if(info.thread_number==0)info.thread_number = 60;
   for(i=0;i<info.thread_number;i++){
-   if(pthread_create(&pt[i],NULL,(void*)tiff_psnr_ssim,&info)<0){
-    printf("pthread_create error\n");
-    exit(1);
+   pthread_mutex_lock(&info.mutex);
+   if(info.format==0){
+    if(pthread_create(&pt[i],NULL,(void*)yuv_psnr_ssim,&info)<0){
+     printf("pthread_create error\n");
+     fflush(stdout);
+     exit(1);
+    }
    }
+   else if(info.format==1){
+    if(pthread_create(&pt[i],NULL,(void*)tiff_psnr_ssim,&info)<0){
+     printf("pthread_create error\n");
+     fflush(stdout);
+     exit(1);
+    }
+   }
+   pthread_mutex_unlock(&info.mutex);
   }
  }
  else{
   tiff_psnr_ssim(&info);
  }
 
-/*
- if(info.format == "yuv") yuv_psnr_ssim();
- else if(info.format == "tiff") tiff_psnr_ssim(&info);
- else if(info.format =="bmp") bmp_psnr_ssim();
-*/
+ pthread_mutex_lock(&info.mutex);
+ int wait_number = info.thread_number;
+ pthread_mutex_unlock(&info.mutex);
 
-if(info.frame_number>=60){
- for(i=0;i<info.thread_number;i++){
-  tmp_pt = pt[i];
-  pthread_join(tmp_pt, NULL);
+ if(info.frame_number>=60){
+  for(i=0;i<wait_number;i++){
+   tmp_pt = pt[i];
+   pthread_join(tmp_pt, NULL);
+  }
  }
-}
 
 for(i=0;i<info.frame_number;i++){
  if(info.mode == 1) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.psnr_value[i]);

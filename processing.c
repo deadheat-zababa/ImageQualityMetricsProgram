@@ -6,11 +6,134 @@
 #include<tiffio.h>
 #include <string.h>
 #include<stdint.h>
+#include<openacc.h>
 #include "quality_evaluation.h"
 #include "processing.h"
+int yuv_psnr_ssim(optinfo *info){
+ unsigned int height = 0;
+ unsigned int width = 0;
+ int i,j,c;
+ int count = 0;
+ double psnr=0;
+ double sum_psnr = 0;
+ double average_psnr = 0;
+ double ssim=0;
+ double sum_ssim=0;
+ double average_ssim=0;
+ unsigned char **y_before;
+ unsigned char **y_after;
+ int stride = 0;
+ int offset=0;
+
+ pthread_mutex_lock(&info->mutex);
+ stride = info->thread_id;
+ printf("thread_id:%d\n",stride);
+ fflush(stdout);
+ info->thread_id++;
+ width = info->width;
+ height = info->height;
+ pthread_mutex_unlock(&info->mutex);
+ 
+ y_before = (unsigned char**)malloc(sizeof(unsigned char*)*(height+10));
+ y_after = (unsigned char**)malloc(sizeof(unsigned char*)*(height+10));
+ 
+ for(i=0;i<height+10;i++){
+  y_before[i] = (unsigned char*)malloc(sizeof(unsigned char)*(width+10));
+  y_after[i] = (unsigned char*)malloc(sizeof(unsigned char)*(width+10));
+  memset(y_before[i],0,width+10);
+  memset(y_after[i],0,width+10);
+ }
+
+ for(count = info->start_number+stride; count<(info->frame_number+info->start_number); count+=info->thread_number){ 
+  offset = (width*(height*1.5));
+  offset = offset * count;
+  //lock
+  pthread_mutex_lock(&info->mutex);
+  printf("count:%d,offset:%d\n",count,offset);
+  fflush(stdout);
+
+  #pragma acc data
+  {
+  #pragma acc kernels
+  #pragma acc loop independent  
+  for(i=5;i<height+5;i++){
+   for(j=5;j<width+5;j++){
+    y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
+    y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
+    //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
+   }
+  }
+  } 
+  pthread_mutex_unlock(&info->mutex);
+  if(count==0){
+
+  for(i=2159;i<height+10;i++){
+   for(j=0;j<width+10;j++){
+    //printf("y_before[%d][%d]:%d\n",i,j,y_before[i][j]);
+   }
+  }
+  }
+
+
+  if(info->mode == 1){
+   psnr = yuv_cal_psnr(y_before,y_after,height,width);
+   sum_psnr += psnr;
+   if(info->show_flag==1) printf("psnr = %lf\n",psnr);
+     
+   pthread_mutex_lock(&info->mutex);
+   info->psnr_value[count-info->start_number] = psnr;
+   pthread_mutex_unlock(&info->mutex);
+  }
+
+  else if(info->mode ==2){
+   ssim = yuv_cal_ssim(y_before,y_after,height,width);
+   sum_ssim += ssim;
+   if(info->show_flag==1) printf("ssim = %lf\n",ssim);
+   pthread_mutex_lock(&info->mutex);
+   info->ssim_value[count-info->start_number] = ssim;
+   pthread_mutex_unlock(&info->mutex);
+  }
+  else if(info->mode ==3){
+   psnr = yuv_cal_psnr(y_before,y_after,height,width);
+   sum_psnr += psnr;
+   ssim = yuv_cal_ssim(y_before,y_after,height,width);
+   sum_ssim += ssim;
+   if(info->show_flag==1){
+    printf("psnr = %lf\n",psnr);
+    printf("ssim = %lf\n",ssim);
+   }
+   pthread_mutex_lock(&info->mutex);
+   info->psnr_value[count-info->start_number] = psnr;
+   info->ssim_value[count-info->start_number] = ssim;
+   pthread_mutex_unlock(&info->mutex);
+  }
+ }
+
+ if(info->frame_number>=60){
+  if(info->mode ==1){
+   pthread_mutex_lock(&info->mutex);
+   info->psnr_value[info->frame_number] += sum_psnr;
+   pthread_mutex_unlock(&info->mutex);
+  }
+  else if(info->mode==2){
+   pthread_mutex_lock(&info->mutex);
+   info->ssim_value[info->frame_number] += sum_ssim;
+   pthread_mutex_unlock(&info->mutex);
+  }
+  else if(info->mode==3){
+   pthread_mutex_lock(&info->mutex);
+   info->psnr_value[info->frame_number] += sum_psnr;
+   info->ssim_value[info->frame_number] += sum_ssim;
+   //info->frame_number+info->start_number
+   pthread_mutex_unlock(&info->mutex);
+  }
+ }
+ return 0;
+}
 
 int tiff_psnr_ssim(optinfo *info){
-	pthread_mutex_lock(&info->mutex);
+ //pthread_mutex_lock(&info->mutex);
+  
  unsigned int before_length = 0;
  unsigned int before_width = 0;
  unsigned int after_length = 0;
@@ -39,17 +162,16 @@ int tiff_psnr_ssim(optinfo *info){
  int stride = 0;
  unsigned char *openfile1;
  unsigned char *openfile2;
- 
- pthread_mutex_unlock(&info->mutex);
- pthread_t tid;
- 
- tid = pthread_self();
- stride = (int)tid-1;
- printf("tid:%d\n",tid);
- fflush(stdout);
 
- openfile1 = (unsigned char *)malloc(sizeof(unsigned char)*(strlen(info->input1_name)+sizeof(int)+5));
- openfile2 = (unsigned char *)malloc(sizeof(unsigned char)*(strlen(info->input2_name)+sizeof(int)+5)); 
+ pthread_mutex_lock(&info->mutex);
+ stride = info->thread_id;
+ printf("thread_id:%d\n",stride);
+ fflush(stdout);
+ info->thread_id++;
+ pthread_mutex_unlock(&info->mutex);
+ 
+ openfile1 = (unsigned char *)malloc(sizeof(unsigned char)*(strlen(info->input1_name)+sizeof(int)+7+strlen("\0")));
+ openfile2 = (unsigned char *)malloc(sizeof(unsigned char)*(strlen(info->input2_name)+sizeof(int)+7+strlen("\0"))); 
 
  for(count = info->start_number+stride; count<(info->frame_number+info->start_number); count+=info->thread_number){ 
   sprintf(openfile1,"%s%05d.tiff",info->input1_name,count);
@@ -120,18 +242,18 @@ int tiff_psnr_ssim(optinfo *info){
 
 		//printf("-------------------------------------------------------\n");
 		if(!TIFFGetField(image1,TIFFTAG_ORIENTATION,&orientation1)){
-			printf("image1 eeeor\n");
+		//	printf("image1 eeeor\n");
 		}
 
 		
 		if(!TIFFGetField(image2,TIFFTAG_ORIENTATION,&orientation2)){
-			printf("image2 eeeor\n");
+		//	printf("image2 eeeor\n");
 		}
 
         if(info->show_flag==1){
-		 printf("image1 orientation:%d\n",orientation1);
-		 printf("image2 orientation:%d\n",orientation2);
-		 fflush(stdout);
+		// printf("image1 orientation:%d\n",orientation1);
+		// printf("image2 orientation:%d\n",orientation2);
+		 //fflush(stdout);
 		}
 
 		//init
@@ -150,8 +272,8 @@ int tiff_psnr_ssim(optinfo *info){
 		}
 
         if(info->show_flag==1){
-		 printf("height:%d,width:%d\n",before_length,before_width);
-		 fflush(stdout);
+		// printf("height:%d,width:%d\n",before_length,before_width);
+		// fflush(stdout);
 		}
 
 	for(j=0;j<before_length;j++){

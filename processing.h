@@ -9,9 +9,10 @@ typedef struct OptionInfo{
  FILE *outfile;
  unsigned short width;
  unsigned short height;
- unsigned char *format;
+ unsigned char format;
  unsigned short frame_number;
  unsigned int start_number;
+ unsigned short thread_id;
  char psnr_flag;
  char ssim_flag;
  char show_flag;
@@ -22,10 +23,10 @@ typedef struct OptionInfo{
  pthread_mutex_t mutex;
 }optinfo;
 
-
+//extern pthread_mutex_t mutex;
 
 int tiff_psnr_ssim(optinfo *);
-//int yuv_psnr_ssim(optinfo *);
+int yuv_psnr_ssim(optinfo *);
 //int bmp_psnr_ssim(optinfo *);
 
 
