@@ -63,7 +63,44 @@ int yuv_psnr_ssim(optinfo *info){
     //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
    }
   }
+
+  //top 
+  for(i=0;i<5;i++){
+   for(j=5;j<width+5;j++){
+    y_before[i][j] = y_before[9-i][j];
+    y_after[i][j] = info->input2_name[];
+   }
+  }
+  //bottom
+  for(i=height+5;i<height+10;i++){
+   for(j=5;j<width+5;j++){
+    y_before[i][j] = info->input1_name[];
+    y_after[i][j] = info->input2_name[];
+   }
+  }
+
+  for(i=0;i<5;i++){
+   for(j=0;j<5;j++){
+    y_before[i][j] = info->input1_name[];
+    y_after[i][j] = info->input2_name[];
+   }
+   for(j=width+5;j<width+10;j++){
+    y_before[i][j] = info->input1_name[];
+    y_after[i][j] = info->input2_name[];
+   }
   } 
+  
+  for(i=height+5;i<height+10;i++){
+   for(j=0;j<5;j++){
+    y_before[i][j] = info->input1_name[];
+    y_after[i][j] = info->input2_name[];
+   }
+   for(j=width+5;j<width+10;j++){
+    y_before[i][j] = info->input1_name[];
+    y_after[i][j] = info->input2_name[];
+   }
+  } 
+
   pthread_mutex_unlock(&info->mutex);
   if(count==0){
 
