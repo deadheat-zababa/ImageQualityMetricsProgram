@@ -63,7 +63,7 @@ int yuv_psnr_ssim(optinfo *info){
     //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
    }
   }
-
+/*
   //top 
   for(i=0;i<5;i++){
    for(j=5;j<width+5;j++){
@@ -100,7 +100,7 @@ int yuv_psnr_ssim(optinfo *info){
     y_after[i][j] = info->input2_name[];
    }
   } 
-
+*/
   pthread_mutex_unlock(&info->mutex);
   if(count==0){
 
