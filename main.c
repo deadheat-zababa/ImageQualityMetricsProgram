@@ -162,7 +162,7 @@ int main(int argc,char **argv){
  unsigned char *name1;
  unsigned char *name2;
 
-  printf("number of device:%d\n",acc_get_num_devices(acc_device_nvidia));
+  //printf("number of device:%d\n",acc_get_num_devices(acc_device_nvidia));
  if(argc<=3){
   printf("Error\n");
   printf("Usage:program.exe -i inputfile -i inputfile -f tiff\n");

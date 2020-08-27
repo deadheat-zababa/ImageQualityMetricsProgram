@@ -9,6 +9,7 @@
 #include<openacc.h>
 #include "quality_evaluation.h"
 #include "processing.h"
+
 int yuv_psnr_ssim(optinfo *info){
  unsigned int height = 0;
  unsigned int width = 0;
@@ -27,8 +28,12 @@ int yuv_psnr_ssim(optinfo *info){
 
  pthread_mutex_lock(&info->mutex);
  stride = info->thread_id;
+ 
+ #if DEBUG
  printf("thread_id:%d\n",stride);
  fflush(stdout);
+ #endif
+
  info->thread_id++;
  width = info->width;
  height = info->height;
@@ -49,13 +54,15 @@ int yuv_psnr_ssim(optinfo *info){
   offset = offset * count;
   //lock
   pthread_mutex_lock(&info->mutex);
+  #if DEBUG
   printf("count:%d,offset:%d\n",count,offset);
   fflush(stdout);
+  #endif
 
-  #pragma acc data
-  {
-  #pragma acc kernels
-  #pragma acc loop independent  
+ // #pragma acc data
+ // {
+ // #pragma acc kernels
+ // #pragma acc loop independent  
   for(i=5;i<height+5;i++){
    for(j=5;j<width+5;j++){
     y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
@@ -102,21 +109,22 @@ int yuv_psnr_ssim(optinfo *info){
   } 
 */
   pthread_mutex_unlock(&info->mutex);
+#if DEBUG
   if(count==0){
-
   for(i=2159;i<height+10;i++){
    for(j=0;j<width+10;j++){
-    //printf("y_before[%d][%d]:%d\n",i,j,y_before[i][j]);
+    printf("y_before[%d][%d]:%d\n",i,j,y_before[i][j]);
    }
   }
   }
-
+#endif
 
   if(info->mode == 1){
    psnr = yuv_cal_psnr(y_before,y_after,height,width);
    sum_psnr += psnr;
+#if DEBUG
    if(info->show_flag==1) printf("psnr = %lf\n",psnr);
-     
+#endif
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[count-info->start_number] = psnr;
    pthread_mutex_unlock(&info->mutex);
@@ -125,7 +133,9 @@ int yuv_psnr_ssim(optinfo *info){
   else if(info->mode ==2){
    ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
+#if DEGUB
    if(info->show_flag==1) printf("ssim = %lf\n",ssim);
+#endif
    pthread_mutex_lock(&info->mutex);
    info->ssim_value[count-info->start_number] = ssim;
    pthread_mutex_unlock(&info->mutex);
@@ -135,10 +145,12 @@ int yuv_psnr_ssim(optinfo *info){
    sum_psnr += psnr;
    ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
+#if DEBUG
    if(info->show_flag==1){
     printf("psnr = %lf\n",psnr);
     printf("ssim = %lf\n",ssim);
    }
+#endif
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[count-info->start_number] = psnr;
    info->ssim_value[count-info->start_number] = ssim;

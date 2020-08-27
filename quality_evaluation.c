@@ -8,9 +8,9 @@ double yuv_Sd(unsigned char **y_before,unsigned char **y_after, float ave_before
     double sd = 0;
     int n=0,m=0;
 
-    #pragma acc data
-    #pragma acc kernels
-    #pragma acc loop independent  
+    //#pragma acc data
+    //#pragma acc kernels
+    //#pragma acc loop independent  
     for(n=i-5;n<=i+5;n++){
         for(m=j-5;m<=j+5;m++){
             sd += (ave_before-y_before[n][m])* (ave_after-y_after[n][m]);
