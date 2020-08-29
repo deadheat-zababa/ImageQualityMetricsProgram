@@ -1,7 +1,6 @@
-#include<math.h>
-#include<getopt.h>
 #include<stdio.h>
 #include<stdlib.h>
+#include<math.h>
 #include<tiff.h>
 #include<tiffio.h>
 #include <string.h>
@@ -9,6 +8,9 @@
 #include<openacc.h>
 #include "quality_evaluation.h"
 #include "processing.h"
+
+#define _FILE_OFFSET_BITS 64
+#define _LARGEFILE_SOURCE
 
 int yuv_psnr_ssim(optinfo *info){
  unsigned int height = 0;
@@ -25,6 +27,7 @@ int yuv_psnr_ssim(optinfo *info){
  unsigned char **y_after;
  int stride = 0;
  int offset=0;
+ int ret=0;
 
  pthread_mutex_lock(&info->mutex);
  stride = info->thread_id;
@@ -48,9 +51,9 @@ int yuv_psnr_ssim(optinfo *info){
   memset(y_before[i],0,width+10);
   memset(y_after[i],0,width+10);
  }
-
+ 
  for(count = info->start_number+stride; count<(info->frame_number+info->start_number); count+=info->thread_number){ 
-  offset = (width*(height*1.5));
+  offset = (int)(width*(height*1.5));
   offset = offset * count;
   //lock
   pthread_mutex_lock(&info->mutex);
@@ -63,13 +66,29 @@ int yuv_psnr_ssim(optinfo *info){
  // {
  // #pragma acc kernels
  // #pragma acc loop independent  
-  for(i=5;i<height+5;i++){
-   for(j=5;j<width+5;j++){
-    y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
-    y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
-    //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
-   }
+  
+  //y_before[5][5] = info->input1_name[offset+height*(i-5)+(j-5)];
+ fseek(info->infile1,0L,SEEK_SET);
+ fseek(info->infile2,0L,SEEK_SET);
+  ret = fseek(info->infile1,offset,SEEK_SET);
+  if(ret !=0){
+   fprintf(stderr,"fseek error\n");
   }
+  ret = fseek(info->infile2,offset,SEEK_SET);
+  if(ret !=0){
+   fprintf(stderr,"fseek error\n");
+  }
+
+  for(i=5;i<height+5;i++){
+    fread(y_before[i],1,width,info->infile1);
+    fread(y_after[i],1,width,info->infile2);
+   
+    //y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
+    //y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
+    //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
+  }
+ fseek(info->infile1,0L,SEEK_SET);
+ fseek(info->infile2,0L,SEEK_SET);
 /*
   //top 
   for(i=0;i<5;i++){
@@ -109,6 +128,7 @@ int yuv_psnr_ssim(optinfo *info){
   } 
 */
   pthread_mutex_unlock(&info->mutex);
+
 #if DEBUG
   if(count==0){
   for(i=2159;i<height+10;i++){
@@ -122,20 +142,23 @@ int yuv_psnr_ssim(optinfo *info){
   if(info->mode == 1){
    psnr = yuv_cal_psnr(y_before,y_after,height,width);
    sum_psnr += psnr;
+
 #if DEBUG
    if(info->show_flag==1) printf("psnr = %lf\n",psnr);
 #endif
+
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[count-info->start_number] = psnr;
    pthread_mutex_unlock(&info->mutex);
   }
-
   else if(info->mode ==2){
    ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
+
 #if DEGUB
    if(info->show_flag==1) printf("ssim = %lf\n",ssim);
 #endif
+
    pthread_mutex_lock(&info->mutex);
    info->ssim_value[count-info->start_number] = ssim;
    pthread_mutex_unlock(&info->mutex);
@@ -145,12 +168,14 @@ int yuv_psnr_ssim(optinfo *info){
    sum_psnr += psnr;
    ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
+
 #if DEBUG
    if(info->show_flag==1){
     printf("psnr = %lf\n",psnr);
     printf("ssim = %lf\n",ssim);
    }
 #endif
+
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[count-info->start_number] = psnr;
    info->ssim_value[count-info->start_number] = ssim;

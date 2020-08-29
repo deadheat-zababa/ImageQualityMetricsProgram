@@ -6,6 +6,8 @@ typedef struct OptionInfo{
  unsigned char *input1_name;
  unsigned char *input2_name;
  unsigned char *output_name;
+ FILE *infile1;
+ FILE *infile2;
  FILE *outfile;
  unsigned short width;
  unsigned short height;

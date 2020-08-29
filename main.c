@@ -4,7 +4,6 @@
 #include<math.h>
 #include<stdint.h>
 #include<string.h>
-#include<string.h>
 #include<tiffio.h>
 #include<openacc.h>
 #include<pthread.h>
@@ -18,6 +17,9 @@
 void setOptionDefault(optinfo *info){
  info->input1_name=NULL;
  info->input2_name=NULL;
+ info->infile1 = NULL;
+ info->infile2 = NULL;
+ info->outfile = NULL;
  info->output_name = NULL;
  info->width = 3840;
  info->height = 2160;
@@ -117,29 +119,29 @@ unsigned long getSize(FILE *fp){
 
 
 void openyuvimg(optinfo *info){
- FILE *before_file;
- FILE *after_file;
+ //FILE *before_file;
+ //FILE *after_file;
  unsigned char *before_img;
  unsigned char *after_img;
  unsigned long before_size;
  unsigned long after_size;
  int ret;
  
- before_file = fopen(info->input1_name,"rb");
- before_size = getSize(before_file);
- before_img = (unsigned char*)malloc(sizeof(unsigned char)*(before_size));
- ret = fread(before_img,before_size,1,before_file);
+ info->infile1 = fopen(info->input1_name,"rb");
+ before_size = getSize(info->infile1);
+ //before_img = (unsigned char*)malloc(sizeof(unsigned char)*(before_size));
+ //ret = fread(before_img,before_size,1,before_file);
  free(info->input1_name);
 
- if((after_file=fopen(info->input2_name,"rb"))==NULL){
+ if((info->infile2=fopen(info->input2_name,"rb"))==NULL){
   perror("print error ");
-  printf("after file read error\n");
+  fprintf(stderr,"after file read error\n");
   fflush(stdout);
  }
 
- after_size = getSize(after_file);
- after_img = (unsigned char*)malloc(sizeof(unsigned char)*(after_size));
- ret = fread(after_img,after_size,1,after_file);
+ after_size = getSize(info->infile2);
+ //after_img = (unsigned char*)malloc(sizeof(unsigned char)*(after_size));
+ //ret = fread(after_img,after_size,1,after_file);
  free(info->input2_name);
 
  if(before_size != after_size) printf("you are fool\n"); 
@@ -148,10 +150,10 @@ void openyuvimg(optinfo *info){
  info->frame_number= (before_size/(info->width*info->height*3))<<1;
  printf("info->frame_number:%d\n",info->frame_number);
 
- info->input1_name = before_img;
- info->input2_name = after_img;
- fclose(before_file);
- fclose(after_file);
+ //info->input1_name = before_img;
+ //info->input2_name = after_img;
+// fclose(before_file);
+// fclose(after_file);
 }
 
 int main(int argc,char **argv){
@@ -176,7 +178,6 @@ int main(int argc,char **argv){
  info.psnr_value = (double*)malloc(sizeof(double)*(info.frame_number+1));
  info.ssim_value = (double *)malloc(sizeof(double)*(info.frame_number+1));
  
-
  if(info.output_name==NULL){
   name1 = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(info.input1_name)));
   name2 = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(info.input2_name)));
@@ -193,8 +194,12 @@ int main(int argc,char **argv){
 
  if((info.outfile=fopen(info.output_name,"a"))==NULL) printf("ERROR\n");
  fflush(stdout);
+
  if(info.mode==1){
-  fprintf(info.outfile,"count,psnr\n");
+  if(fprintf(info.outfile,"count,psnr\n")<0){
+   fprintf(stderr,"read error\n");
+   exit(1);
+  }
  }
  else if(info.mode ==2){
    fprintf(info.outfile,"count,ssim,\n");
@@ -202,6 +207,7 @@ int main(int argc,char **argv){
  else if(info.mode ==3){
   fprintf(info.outfile,"count,psnr,ssim,\n");
  }
+
  pthread_t *pt;
  pthread_t tmp_pt;
  pt = (pthread_t*)malloc(sizeof(pthread_t)*info.thread_number);
