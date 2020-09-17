@@ -25,7 +25,7 @@ int yuv_psnr_ssim(optinfo *info){
  unsigned char **y_after;
  int stride = 0;
  int offset=0;
-
+ int ret = 0;
  pthread_mutex_lock(&info->mutex);
  stride = info->thread_id;
  
@@ -59,72 +59,39 @@ int yuv_psnr_ssim(optinfo *info){
   fflush(stdout);
   #endif
 
- // #pragma acc data
- // {
- // #pragma acc kernels
- // #pragma acc loop independent  
+  fseek(info->infile1,0L,SEEK_SET);
+  fseek(info->infile2,0L,SEEK_SET);
+  ret = fseek(info->infile1,offset,SEEK_SET);
+  if(ret != 0) fprintf(stderr,"fseek error\n");
+  ret = fseek(info->infile2,offset,SEEK_SET);
+  if(ret != 0) fprintf(stderr,"fseek error\n");
+
   for(i=5;i<height+5;i++){
    for(j=5;j<width+5;j++){
-    y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
-    y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
+    fread(y_before[i],1,width,info->infile1);
+    fread(y_after[i],1,width,info->infile2);
+   // y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
+   // y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
     //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
    }
   }
-/*
-  //top 
-  for(i=0;i<5;i++){
-   for(j=5;j<width+5;j++){
-    y_before[i][j] = y_before[9-i][j];
-    y_after[i][j] = info->input2_name[];
-   }
-  }
-  //bottom
-  for(i=height+5;i<height+10;i++){
-   for(j=5;j<width+5;j++){
-    y_before[i][j] = info->input1_name[];
-    y_after[i][j] = info->input2_name[];
-   }
-  }
-
-  for(i=0;i<5;i++){
-   for(j=0;j<5;j++){
-    y_before[i][j] = info->input1_name[];
-    y_after[i][j] = info->input2_name[];
-   }
-   for(j=width+5;j<width+10;j++){
-    y_before[i][j] = info->input1_name[];
-    y_after[i][j] = info->input2_name[];
-   }
-  } 
-  
-  for(i=height+5;i<height+10;i++){
-   for(j=0;j<5;j++){
-    y_before[i][j] = info->input1_name[];
-    y_after[i][j] = info->input2_name[];
-   }
-   for(j=width+5;j<width+10;j++){
-    y_before[i][j] = info->input1_name[];
-    y_after[i][j] = info->input2_name[];
-   }
-  } 
-*/
   pthread_mutex_unlock(&info->mutex);
 #if DEBUG
   if(count==0){
-  for(i=2159;i<height+10;i++){
-   for(j=0;j<width+10;j++){
-    printf("y_before[%d][%d]:%d\n",i,j,y_before[i][j]);
+   for(i=height-1;i<height+10;i++){
+    for(j=0;j<width+10;j++){
+     printf("y_before[%d][%d]:%d\n",i,j,y_before[i][j]);
+    }
    }
-  }
   }
 #endif
 
   if(info->mode == 1){
    psnr = yuv_cal_psnr(y_before,y_after,height,width);
    sum_psnr += psnr;
-#if DEBUG
+//#if DEBUG
    if(info->show_flag==1) printf("psnr = %lf\n",psnr);
-#endif
+//#endif
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[count-info->start_number] = psnr;
    pthread_mutex_unlock(&info->mutex);
@@ -133,13 +100,12 @@ int yuv_psnr_ssim(optinfo *info){
   else if(info->mode ==2){
    ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
-#if DEGUB
    if(info->show_flag==1) printf("ssim = %lf\n",ssim);
-#endif
    pthread_mutex_lock(&info->mutex);
    info->ssim_value[count-info->start_number] = ssim;
    pthread_mutex_unlock(&info->mutex);
   }
+
   else if(info->mode ==3){
    psnr = yuv_cal_psnr(y_before,y_after,height,width);
    sum_psnr += psnr;
@@ -156,9 +122,11 @@ int yuv_psnr_ssim(optinfo *info){
    info->ssim_value[count-info->start_number] = ssim;
    pthread_mutex_unlock(&info->mutex);
   }
+
+
  }
 
- if(info->frame_number>=60){
+/* if(info->frame_number>=60){
   if(info->mode ==1){
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[info->frame_number] += sum_psnr;
@@ -177,6 +145,14 @@ int yuv_psnr_ssim(optinfo *info){
    pthread_mutex_unlock(&info->mutex);
   }
  }
+*/
+ for(i=0;i<height+10;i++){
+  free(y_before[i]);
+  free(y_after[i]);
+ }
+ free(y_before);
+ free(y_after);
+
  return 0;
 }
 

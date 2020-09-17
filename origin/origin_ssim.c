@@ -5,21 +5,73 @@
 #define K 0.05
 #define L 100
 
-/*
-double *lpf(double *luma,f){
+
+double *lpf(double *luma,int *width,int *height,int f){
  //automatic downsampling
  //downsampling by f
  //use a simple lowpass filter
+  double *img = NULL;
+  double *padimg = NULL;
+  int *lpf = NULL;
+  int i,j;
+  int sum = 0;
 
-  double img = NULL;
-  lpf = (unsigned char*)malloc(sizeof(unsigned char)*f*f);//ones(f,f);
-  lpf = lpf/sum(lpf(:));
-  img= imfilter(img1,lpf,"symmetric","same");
-  img(1:f:end,1:f:end);
+  lpf = (unsigned int*)malloc(sizeof(unsigned int)*f*f);//ones(f,f);
+  
+  for(i=0;i<f;i++){
+   for(i=0;i<f;i++){
+    lpf[i*f+j] = 1;
+    sum++;
+   }
+  }
+
+  for(i=0;i<f;i++){
+   for(i=0;i<f;i++)
+    lpf[i*f+j] = lpf[i*f+j]/sum;
+  }
+ 
+  padimg = (double*)malloc((f+width)*(f+height));
+  
+  for(i=0;i;<(f+width)*(f*height);i++){
+   padimg[i] = 0;
+  }
+// 
+  for(i=0;i;<f;i++){
+   for(j=f;j<width;j++){
+    padimg[i*(height+f)+j] = luma[((f-1)-i)*height+(j-f)];
+   }
+  }
+  for(i=f;i;<height;i++){
+   for(j=f;j<width;j++){
+    padimg[i*(height+f)+j] = luma[(i-f)*height+(j-f)];
+   }
+  }
+  for(i=height;i;<height+f;i++){
+   for(j=f;j<width;j++){
+    padimg[i*(height+f)+j] = luma[(i-(f+1))*height+(j-f)];
+   }
+  }
+
+
+  for(i=0;i;<height+f;i++){
+   for(j=0;j<f;j++){
+    padimg[i*(height+f)+j] = padimg[i*(height+2*f)+(j+(f-1))];
+    padimg[i*(height+f)+width+j] = padimg[i*(height+2*f)+(width+2*f)-j];
+  }
+  
+  img = (double*)malloc((f+width)*(f+height));
+
+  for(i=0;i;<height;i++){
+   for(j=0;j<width;j++){
+    img[] = padimg*
+   }
+  }
+
+  if(padimg != NULL) free(padimg);
+  if(lpf != NULL) free(lpf);
+ 
   return img;
 }
-
-*/
 
 /*
  squared
@@ -163,6 +215,13 @@ void ssim(double *y1, double *y2,int width,int height){
  int f=0;
  double window[WINDOWSIZE*WINDOWSIZE];
  int i,j;
+
+ f = max(1,(min(M,N)/256));
+
+ if(f>1){
+  y1 = filter(y1,width,height,f);
+  y2 = filter(y2, width,height,f);
+ }
 
  c1 = (K*L)*(K*L);
  c2 = (K*L)*(K*L);

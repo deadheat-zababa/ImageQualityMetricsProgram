@@ -18,11 +18,13 @@
 void setOptionDefault(optinfo *info){
  info->input1_name=NULL;
  info->input2_name=NULL;
+ info->infile1 = NULL;
+ info->infile2 = NULL;
  info->output_name = NULL;
  info->width = 3840;
  info->height = 2160;
  info->format = 1; 
- info->frame_number = 1;
+ info->frame_number = 0;
  info->start_number = 0;
  info->thread_id = 0;
  info->psnr_flag = 0;
@@ -39,7 +41,7 @@ int setOption(int argc,char **argv,optinfo *info){
  char a=0;
  setOptionDefault(info);
  
- while((opt = getopt(argc,argv,"i:n:o:f:s:m:p:v:"))!= -1){
+ while((opt = getopt(argc,argv,"i:n:o:f:s:m:p:v:W:H:h"))!= -1){
   switch(opt){
    case 'i':
     printf("-i %s\n",optarg);
@@ -86,12 +88,23 @@ int setOption(int argc,char **argv,optinfo *info){
     info->thread_number = atoi(optarg);
     printf("therad number:%d\n",info->thread_number);
    break;
+ 
    case 'v':
     info->show_flag = atoi(optarg);
     if(info->show_flag > 1){
       info->show_flag=1;
     }
     printf("show:%d\n",info->show_flag);
+   break;
+   
+  case 'W':
+    info->width = (unsigned int)atoi(optarg);
+    printf("width : %d\n",info->width);
+   break;
+   
+  case 'H':
+    info->height = (unsigned int)atoi(optarg);
+    printf("height : %d\n",info->height);
    break;
 
    case 'h':
@@ -117,41 +130,44 @@ unsigned long getSize(FILE *fp){
 
 
 void openyuvimg(optinfo *info){
- FILE *before_file;
- FILE *after_file;
+// FILE *before_file;
+// FILE *after_file;
  unsigned char *before_img;
  unsigned char *after_img;
  unsigned long before_size;
  unsigned long after_size;
  int ret;
  
- before_file = fopen(info->input1_name,"rb");
- before_size = getSize(before_file);
- before_img = (unsigned char*)malloc(sizeof(unsigned char)*(before_size));
- ret = fread(before_img,before_size,1,before_file);
+ info->infile1 = fopen(info->input1_name,"rb");
+ before_size = getSize(info->infile1);
+// before_img = (unsigned char*)malloc(sizeof(unsigned char)*(before_size));
+// ret = fread(before_img,before_size,1,before_file);
  free(info->input1_name);
 
- if((after_file=fopen(info->input2_name,"rb"))==NULL){
+ if((info->infile2=fopen(info->input2_name,"rb"))==NULL){
   perror("print error ");
   printf("after file read error\n");
   fflush(stdout);
  }
 
- after_size = getSize(after_file);
- after_img = (unsigned char*)malloc(sizeof(unsigned char)*(after_size));
- ret = fread(after_img,after_size,1,after_file);
+ after_size = getSize(info->infile2);
+// after_img = (unsigned char*)malloc(sizeof(unsigned char)*(after_size));
+// ret = fread(after_img,after_size,1,after_file);
  free(info->input2_name);
 
  if(before_size != after_size) printf("you are fool\n"); 
  printf("before_size:%ld,after_size:%ld\n",before_size,after_size);
  printf("width:%d,height:%d\n",info->width,info->height);
- info->frame_number= (before_size/(info->width*info->height*3))<<1;
- printf("info->frame_number:%d\n",info->frame_number);
+ if(info->frame_number==0){
+  info->frame_number= (before_size/(info->width*info->height*3))<<1;
+  printf("info->frame_number:%d\n",info->frame_number);
+ }
 
- info->input1_name = before_img;
- info->input2_name = after_img;
- fclose(before_file);
- fclose(after_file);
+ printf("filep :%p\n",info->infile1);
+// info->input1_name = before_img;
+// info->input2_name = after_img;
+// fclose(before_file);
+// fclose(after_file);
 }
 
 int main(int argc,char **argv){
@@ -173,8 +189,6 @@ int main(int argc,char **argv){
  if(setOption(argc,argv,&info)==-1) exit(1);
  fflush(stdout);
  
- info.psnr_value = (double*)malloc(sizeof(double)*(info.frame_number+1));
- info.ssim_value = (double *)malloc(sizeof(double)*(info.frame_number+1));
  
 
  if(info.output_name==NULL){
@@ -194,6 +208,7 @@ int main(int argc,char **argv){
  if((info.outfile=fopen(info.output_name,"a"))==NULL) printf("ERROR\n");
  fflush(stdout);
  if(info.mode==1){
+  printf("test.csv %p\n",info.outfile);
   fprintf(info.outfile,"count,psnr\n");
  }
  else if(info.mode ==2){
@@ -202,13 +217,26 @@ int main(int argc,char **argv){
  else if(info.mode ==3){
   fprintf(info.outfile,"count,psnr,ssim,\n");
  }
+
  pthread_t *pt;
  pthread_t tmp_pt;
+
+ if(info.format == 0) openyuvimg(&info);
+ else{
+  if(info.frame_number ==0) info.frame_number = 1;
+ }
+ printf("filep :%p\n",info.infile1);
+ 
+ if(info.frame_number < info.thread_number){
+  info.thread_number = info.frame_number;
+ }
+ 
+ info.psnr_value = (double*)malloc(sizeof(double)*(info.frame_number+1));
+ info.ssim_value = (double *)malloc(sizeof(double)*(info.frame_number+1));
+
  pt = (pthread_t*)malloc(sizeof(pthread_t)*info.thread_number);
  pthread_mutex_init(&info.mutex,NULL);
 
- if(info.format == 0) openyuvimg(&info);
- if(info.frame_number>=60){
   for(i=0;i<info.thread_number;i++){
    pthread_mutex_lock(&info.mutex);
    if(info.format==0){
@@ -227,23 +255,20 @@ int main(int argc,char **argv){
    }
    pthread_mutex_unlock(&info.mutex);
   }
- }
- else{
-  tiff_psnr_ssim(&info);
- }
 
  pthread_mutex_lock(&info.mutex);
  int wait_number = info.thread_number;
  pthread_mutex_unlock(&info.mutex);
 
- if(info.frame_number>=60){
   for(i=0;i<wait_number;i++){
    tmp_pt = pt[i];
    pthread_join(tmp_pt, NULL);
   }
- }
+
+printf("info.frame_number:%d\n",info.frame_number);
 
 for(i=0;i<info.frame_number;i++){
+ printf("test.csv %p\n",info.outfile);
  if(info.mode == 1) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.psnr_value[i]);
  if(info.mode == 2) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.ssim_value[i]);
  if(info.mode == 3) fprintf(info.outfile,"%d FRAME,%lf,%lf,\n",i,info.psnr_value[i],info.ssim_value[i]);
@@ -263,8 +288,11 @@ if(info.mode == 2 ||info.mode ==3) average_ssim = (info.ssim_value[info.frame_nu
  }
 
  pthread_mutex_destroy(&info.mutex);
+ free(info.psnr_value);
+ free(info.ssim_value);
  fclose(info.outfile);
- 
+ fclose(info.infile1);
+ fclose(info.infile2); 
  printf("end\n");
  return 0;
 }
