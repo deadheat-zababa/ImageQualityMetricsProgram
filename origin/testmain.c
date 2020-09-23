@@ -74,6 +74,8 @@ int main(int argc ,char **argv){
  
 //  for(i=0;i<height;i+=row)
 //   TIFFReadEncodedStrip(tiff2,TIFFComputeStrip(tiff2,i,0),tmp2,row*width*spp);
+  FILE *fpx;
+  fpx = fopen("xxxxx.yuv","wb");
 
   tmp2 = (unsigned char*)_TIFFmalloc(TIFFScanlineSize(tiff2));
   y2 = (double*)malloc(sizeof(double)*width*height);
@@ -83,10 +85,15 @@ int main(int argc ,char **argv){
 
    for(j=0;j<width;j++){
     y2[i*height+j] = tmp2[j];
+    
+    fwrite(&tmp2[j],1,1,fpx);
+    
    }
 
   }
-  _TIFFfree(tmp2);
+  fclose(fpx);  
+ 
+  free(tmp2);
   TIFFClose(tiff2);
   tiff2 = NULL;
   tmp2 = NULL;
