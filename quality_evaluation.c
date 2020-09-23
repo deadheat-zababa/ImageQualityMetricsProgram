@@ -173,16 +173,16 @@ double yuv_cal_psnr(unsigned char **y_before,unsigned char **y_after,int height,
 
  sum_numerator = height*width;
  sum_numerator = sum_numerator*255*255;
- #pragma acc data
- {
- #pragma acc kernels
- #pragma acc loop independent
+// #pragma acc data
+// {
+// #pragma acc kernels
+// #pragma acc loop independent
   for(i=5;i<height+5;i++){
    for(j=5;j<width+5;j++){
     sum_denominator += (y_before[i][j]-y_after[i][j])*(y_before[i][j]-y_after[i][j]);
    }
   }
- }
+// }
  //printf("sum_nemurator:%lf\n",sum_numerator);
  //fflush(stdout);
  

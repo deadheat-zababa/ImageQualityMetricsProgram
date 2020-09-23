@@ -37,8 +37,10 @@ int yuv_psnr_ssim(optinfo *info){
  info->thread_id++;
  width = info->width;
  height = info->height;
+
  pthread_mutex_unlock(&info->mutex);
- 
+
+
  y_before = (unsigned char**)malloc(sizeof(unsigned char*)*(height+10));
  y_after = (unsigned char**)malloc(sizeof(unsigned char*)*(height+10));
  
@@ -52,30 +54,35 @@ int yuv_psnr_ssim(optinfo *info){
  for(count = info->start_number+stride; count<(info->frame_number+info->start_number); count+=info->thread_number){ 
   offset = (width*(height*1.5));
   offset = offset * count;
+
   //lock
   pthread_mutex_lock(&info->mutex);
-  #if DEBUG
+
+ 
   printf("count:%d,offset:%d\n",count,offset);
   fflush(stdout);
-  #endif
+  
 
-  fseek(info->infile1,0L,SEEK_SET);
-  fseek(info->infile2,0L,SEEK_SET);
+//  fseek(info->infile1,0L,SEEK_SET);
+ // fseek(info->infile2,0L,SEEK_SET);
   ret = fseek(info->infile1,offset,SEEK_SET);
   if(ret != 0) fprintf(stderr,"fseek error\n");
   ret = fseek(info->infile2,offset,SEEK_SET);
   if(ret != 0) fprintf(stderr,"fseek error\n");
 
   for(i=5;i<height+5;i++){
-   for(j=5;j<width+5;j++){
+   //for(j=5;j<width+5;j++){
     fread(y_before[i],1,width,info->infile1);
     fread(y_after[i],1,width,info->infile2);
    // y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
    // y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
     //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
-   }
+   //}
   }
+ //unlock
   pthread_mutex_unlock(&info->mutex);
+
+
 #if DEBUG
   if(count==0){
    for(i=height-1;i<height+10;i++){

@@ -268,7 +268,7 @@ int main(int argc,char **argv){
 printf("info.frame_number:%d\n",info.frame_number);
 
 for(i=0;i<info.frame_number;i++){
- printf("test.csv %p\n",info.outfile);
+ //printf("test.csv %p\n",info.outfile);
  if(info.mode == 1) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.psnr_value[i]);
  if(info.mode == 2) fprintf(info.outfile,"%d FRAME,%lf,\n",i,info.ssim_value[i]);
  if(info.mode == 3) fprintf(info.outfile,"%d FRAME,%lf,%lf,\n",i,info.psnr_value[i],info.ssim_value[i]);
