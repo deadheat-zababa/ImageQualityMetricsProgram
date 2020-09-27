@@ -191,6 +191,7 @@ double yuv_cal_psnr(unsigned char **y_before,unsigned char **y_after,int height,
  psnr = 10* log10(sum_numerator / sum_denominator);
  if(psnr==check_psnr){
   printf("OK\n");
+  printf("psnr:%lf\n",psnr);
  }
  else{
   printf("unmatching\n");

@@ -7,6 +7,7 @@
 #include <string.h>
 #include<stdint.h>
 #include<openacc.h>
+#include<ssim.h>
 #include "quality_evaluation.h"
 #include "processing.h"
 
@@ -26,6 +27,7 @@ int yuv_psnr_ssim(optinfo *info){
  int stride = 0;
  int offset=0;
  int ret = 0;
+ char mode = 0;
  pthread_mutex_lock(&info->mutex);
  stride = info->thread_id;
  
@@ -37,7 +39,7 @@ int yuv_psnr_ssim(optinfo *info){
  info->thread_id++;
  width = info->width;
  height = info->height;
-
+ mode = info->ssim_mode;
  pthread_mutex_unlock(&info->mutex);
 
 
@@ -105,8 +107,13 @@ int yuv_psnr_ssim(optinfo *info){
   }
 
   else if(info->mode ==2){
-   ssim = yuv_cal_ssim(y_before,y_after,height,width);
+   if(mode == 1){
+    printf("height:%d\n",height);
+    ssim = origin_yuv_cal_ssim(y_before,y_after,height,width);
+   }
+   else ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
+
    if(info->show_flag==1) printf("ssim = %lf\n",ssim);
    pthread_mutex_lock(&info->mutex);
    info->ssim_value[count-info->start_number] = ssim;
@@ -116,7 +123,10 @@ int yuv_psnr_ssim(optinfo *info){
   else if(info->mode ==3){
    psnr = yuv_cal_psnr(y_before,y_after,height,width);
    sum_psnr += psnr;
-   ssim = yuv_cal_ssim(y_before,y_after,height,width);
+   if(mode == 1){
+    ssim = origin_yuv_cal_ssim(y_before,y_after,height,width);
+   }
+   else ssim = yuv_cal_ssim(y_before,y_after,height,width);
    sum_ssim += ssim;
 #if DEBUG
    if(info->show_flag==1){
@@ -133,7 +143,7 @@ int yuv_psnr_ssim(optinfo *info){
 
  }
 
-/* if(info->frame_number>=60){
+
   if(info->mode ==1){
    pthread_mutex_lock(&info->mutex);
    info->psnr_value[info->frame_number] += sum_psnr;
@@ -151,8 +161,7 @@ int yuv_psnr_ssim(optinfo *info){
    //info->frame_number+info->start_number
    pthread_mutex_unlock(&info->mutex);
   }
- }
-*/
+
  for(i=0;i<height+10;i++){
   free(y_before[i]);
   free(y_after[i]);

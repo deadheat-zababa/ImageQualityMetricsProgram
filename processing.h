@@ -19,6 +19,7 @@ typedef struct OptionInfo{
  char ssim_flag;
  char show_flag;
  char mode;
+ char ssim_mode;
  char thread_number;
  double *ssim_value;
  double *psnr_value;

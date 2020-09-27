@@ -45,7 +45,7 @@ int main(int argc ,char **argv){
    TIFFReadScanline(tiff,tmp,i,spp);
 
    for(j=0;j<width;j++){
-    y[i*height+j] = tmp[j];
+    y[i*width+j] = tmp[j];
    }
   }
   free(tmp);
@@ -84,7 +84,7 @@ int main(int argc ,char **argv){
    TIFFReadScanline(tiff2,tmp2,i,spp);
 
    for(j=0;j<width;j++){
-    y2[i*height+j] = tmp2[j];
+    y2[i*width+j] = tmp2[j];
     
     fwrite(&tmp2[j],1,1,fpx);
     

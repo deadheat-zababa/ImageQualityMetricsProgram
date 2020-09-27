@@ -31,6 +31,7 @@ void setOptionDefault(optinfo *info){
  info->ssim_flag = 0;
  info->show_flag = 1;
  info->mode = 3;
+ info->ssim_mode = 0;
  info->thread_number = 10;
  info->psnr_value = NULL;
  info->ssim_value = NULL;
@@ -41,7 +42,7 @@ int setOption(int argc,char **argv,optinfo *info){
  char a=0;
  setOptionDefault(info);
  
- while((opt = getopt(argc,argv,"i:n:o:f:s:m:p:v:W:H:h"))!= -1){
+ while((opt = getopt(argc,argv,"i:n:o:f:s:m:p:v:x:W:H:h"))!= -1){
   switch(opt){
    case 'i':
     printf("-i %s\n",optarg);
@@ -95,6 +96,13 @@ int setOption(int argc,char **argv,optinfo *info){
       info->show_flag=1;
     }
     printf("show:%d\n",info->show_flag);
+   break;
+  
+   case 'x':
+    info->ssim_mode = atoi(optarg);
+    if(info->ssim_mode>1) info->ssim_mode=1;
+    else if(info->ssim_mode<0) info->ssim_mode=0;
+    printf("ssim_mode%d\n",info->ssim_mode);
    break;
    
   case 'W':
