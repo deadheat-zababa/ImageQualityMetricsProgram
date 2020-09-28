@@ -74,10 +74,10 @@ int yuv_psnr_ssim(optinfo *info){
 
   for(i=5;i<height+5;i++){
    //for(j=5;j<width+5;j++){
-    fread(y_before[i],1,width,info->infile1);
-    fread(y_after[i],1,width,info->infile2);
-   // y_before[i][j] = info->input1_name[offset+height*(i-5)+(j-5)];
-   // y_after[i][j] = info->input2_name[offset+height*(i-5)+(j-5)];
+    fread(&y_before[i][5],1,width,info->infile1);
+    fread(&y_after[i][5],1,width,info->infile2);
+    // y_before[i][j] = info->infile1[offset+height*(i-5)+(j-5)];
+    // y_after[i][j] = info->infile2[offset+height*(i-5)+(j-5)];
     //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
    //}
   }
