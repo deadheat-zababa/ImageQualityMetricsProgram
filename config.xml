@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+	
+ <!-- 1:PSNT 2:SSIM 3:PSNR and SSIM -->
+ <entry key="mode">1</entry>
+ 
+ <!--  -->
+ <entry key="prefile">test</entry>
+ 
+ <!-- decoded file -->
+ <entry key="postfile"></entry>
+ 
+ <!-- result csv file name -->
+ <entry key="csvresultfile"></entry>
+ 
+ <!-- 1:PSNT 2:SSIM 3:PSNR and SSIM -->
+ <entry key="startnumber">0</entry>
+ 
+ <!--  -->
+ <entry key="framenum">60</entry>
+ 
+ <!-- width of frame -->
+ <entry key="width">3840</entry>
+ 
+ <!-- height of frame -->
+ <entry key="height">2160</entry>
+
+ <!-- 0:video 1:yuv(image) 2:tiff(image)-->
+ <entry key="format">0</entry>
+
+ <!-- ptint calculate result -->
+ <entry key="show_flag">0</entry>
+ 
+ <!-- number of calclate threads -->
+ <entry key="threadnum">10</entry>
+
+ <!-- calculate ssim 0:original 1:custom -->
+ <entry key="ssim_mode">0</entry>
+
+ <entry key="ssim_windowsize">12</entry>
+
+ <entry key="ssim_filter">0</entry>
+
+ <entry key="loglevel">2</entry>
+
+</config>

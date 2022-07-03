@@ -28,6 +28,9 @@ int yuv_psnr_ssim(optinfo *info){
  int offset=0;
  int ret = 0;
  char mode = 0;
+ int format = 0;
+
+ //lock
  pthread_mutex_lock(&info->mutex);
  stride = info->thread_id;
  
@@ -40,8 +43,9 @@ int yuv_psnr_ssim(optinfo *info){
  width = info->width;
  height = info->height;
  mode = info->ssim_mode;
+ fortmat = info->fortmat;
+ //unlock
  pthread_mutex_unlock(&info->mutex);
-
 
  y_before = (unsigned char**)malloc(sizeof(unsigned char*)*(height+10));
  y_after = (unsigned char**)malloc(sizeof(unsigned char*)*(height+10));
@@ -60,27 +64,27 @@ int yuv_psnr_ssim(optinfo *info){
   //lock
   pthread_mutex_lock(&info->mutex);
 
- 
-  printf("count:%d,offset:%d\n",count,offset);
-  fflush(stdout);
+  if(1 == format){
+   printf("count:%d,offset:%d\n",count,offset);
   
+   ret = fseek(info->infile1,offset,SEEK_SET);
+   if(ret != 0){
+     fprintf(stderr,"fseek error\n");
+   }
+   ret = fseek(info->infile2,offset,SEEK_SET);
+   if(ret != 0) {
+     fprintf(stderr,"fseek error\n");
+   }
 
-//  fseek(info->infile1,0L,SEEK_SET);
- // fseek(info->infile2,0L,SEEK_SET);
-  ret = fseek(info->infile1,offset,SEEK_SET);
-  if(ret != 0) fprintf(stderr,"fseek error\n");
-  ret = fseek(info->infile2,offset,SEEK_SET);
-  if(ret != 0) fprintf(stderr,"fseek error\n");
-
-  for(i=5;i<height+5;i++){
-   //for(j=5;j<width+5;j++){
+   for(i=5;i<height+5;i++){
     fread(&y_before[i][5],1,width,info->infile1);
     fread(&y_after[i][5],1,width,info->infile2);
-    // y_before[i][j] = info->infile1[offset+height*(i-5)+(j-5)];
-    // y_after[i][j] = info->infile2[offset+height*(i-5)+(j-5)];
-    //printf("y_before[%d][%d]i:%d\n",i,j,y_before[i][j]);
-   //}
+   }
   }
+  else if(0 == format){
+
+  }
+
  //unlock
   pthread_mutex_unlock(&info->mutex);
 
@@ -262,6 +266,7 @@ int tiff_psnr_ssim(optinfo *info){
 	 TIFFClose(image2);
 	 exit(1);
 	}
+
 	rgbData_before = (unsigned char*)malloc(sizeof(unsigned char)*before_width*before_length*3);
 	rgbData_after = (unsigned char*)malloc(sizeof(unsigned char)*after_width*after_length*3);
 
@@ -272,29 +277,28 @@ int tiff_psnr_ssim(optinfo *info){
 	 exit(1);
 	}
 
-			y_before = (float**)malloc(sizeof(float*)*before_length);
-			y_after = (float**)malloc(sizeof(float*)*before_length);
-    		for(i=0;i<before_length;i++){
-				y_before[i] = (float*)malloc(sizeof(float)*before_width);
-				y_after[i] = (float*)malloc(sizeof(float)*before_width);
-			}
+	y_before = (float**)malloc(sizeof(float*)*before_length);
+	y_after = (float**)malloc(sizeof(float*)*before_length);
+  
+  for(i=0;i<before_length;i++){
+	 y_before[i] = (float*)malloc(sizeof(float)*before_width);
+	 y_after[i] = (float*)malloc(sizeof(float)*before_width);
+	}
 
-		}
+ }
 
-		//printf("-------------------------------------------------------\n");
-		if(!TIFFGetField(image1,TIFFTAG_ORIENTATION,&orientation1)){
-		//	printf("image1 eeeor\n");
-		}
+ if(!TIFFGetField(image1,TIFFTAG_ORIENTATION,&orientation1)){
+  printf("image1 eeeor\n");
+ }
 
 		
-		if(!TIFFGetField(image2,TIFFTAG_ORIENTATION,&orientation2)){
-		//	printf("image2 eeeor\n");
-		}
+ if(!TIFFGetField(image2,TIFFTAG_ORIENTATION,&orientation2)){
+  printf("image2 eeeor\n");
+ }
 
-        if(info->show_flag==1){
-		// printf("image1 orientation:%d\n",orientation1);
-		// printf("image2 orientation:%d\n",orientation2);
-		 //fflush(stdout);
+    if(info->show_flag==1){
+		 printf("image1 orientation:%d\n",orientation1);
+		 printf("image2 orientation:%d\n",orientation2);
 		}
 
 		//init
@@ -312,9 +316,8 @@ int tiff_psnr_ssim(optinfo *info){
 			exit(1);
 		}
 
-        if(info->show_flag==1){
-		// printf("height:%d,width:%d\n",before_length,before_width);
-		// fflush(stdout);
+    if(info->show_flag==1){
+		 printf("height:%d,width:%d\n",before_length,before_width);
 		}
 
 	for(j=0;j<before_length;j++){
@@ -363,30 +366,11 @@ int tiff_psnr_ssim(optinfo *info){
      pthread_mutex_unlock(&info->mutex);
     }
 
-/*
-	if(info->mode == 1) fprintf(info->outfile,"%d FRAME,%lf,\n",count,psnr);
-    if(info->mode == 2) fprintf(info->outfile,"%d FRAME,%lf,\n",count,ssim);
-	if(info->mode == 3) fprintf(info->outfile,"%d FRAME,%lf,%lf,\n",count,psnr,ssim);
- */
 	TIFFClose(image1);
 	TIFFClose(image2);
 	fflush(stdout);
  }
- /*
-    if(info->mode == 1 ||info->mode ==3) average_psnr = (sum_psnr/info->frame_number);
-	if(info->mode == 2 ||info->mode ==3) average_ssim = (sum_ssim/info->frame_number);
-    
-	fprintf(info->outfile,"\n");
-	if(info->mode == 1 ||info->mode ==3){
-	 fprintf(info->outfile,"SUM(PSNR),%lf,\n",sum_psnr);
-	 fprintf(info->outfile,"AVE(PSNR),%lf,\n",average_psnr);
-	}
 
-
-    if(info->mode == 2 ||info->mode ==3){
-	 fprintf(info->outfile,"SUM(SSIM),%lf,\n",sum_ssim);
-	 fprintf(info->outfile,"AVE(SSIM),%lf,\n",average_ssim);
-}*/
 if(info->frame_number>=60){
  if(info->mode ==1){
   pthread_mutex_lock(&info->mutex);
@@ -406,10 +390,6 @@ if(info->frame_number>=60){
   pthread_mutex_unlock(&info->mutex);
  }
 }
- //-------------------TEST----------------------
- //test=stride;
- //printf("thread:%d--TEST_VALUE:%d",stride,test);
- //---------------------------------------------
 
  free(rgbaData_before);
  free(rgbaData_after);

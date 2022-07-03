@@ -9,125 +9,22 @@
 #include<openacc.h>
 #include<pthread.h>
 #include"processing.h"
+#include "readconfig.h"
+#include "log.h"
 
+#define VIDEOMODE 0
+#define YUVMODE 1
+#define TIFFMODE 2
 
 #define _FILE_OFFSET_BITS 64
 #define _LARGEFILE_SOURCE
 //pthread_mutex_t mutex;
 
-void setOptionDefault(optinfo *info){
- info->input1_name=NULL;
- info->input2_name=NULL;
- info->infile1 = NULL;
- info->infile2 = NULL;
- info->output_name = NULL;
- info->width = 3840;
- info->height = 2160;
- info->format = 1; 
- info->frame_number = 0;
- info->start_number = 0;
- info->thread_id = 0;
- info->psnr_flag = 0;
- info->ssim_flag = 0;
- info->show_flag = 1;
- info->mode = 3;
- info->ssim_mode = 0;
- info->thread_number = 10;
- info->psnr_value = NULL;
- info->ssim_value = NULL;
-}
+logger log;
 
-int setOption(int argc,char **argv,optinfo *info){
- int opt;
- char a=0;
- setOptionDefault(info);
- 
- while((opt = getopt(argc,argv,"i:n:o:f:s:m:p:v:x:W:H:h"))!= -1){
-  switch(opt){
-   case 'i':
-    printf("-i %s\n",optarg);
-    if(a==0){
-     info->input1_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg)+1);
-     memcpy(info->input1_name,optarg,sizeof(unsigned char)*strlen(optarg));
-    }
-    else if(a==1){
-     info->input2_name = (unsigned char*)malloc(sizeof(unsigned char)*strlen(optarg)+1);
-     memcpy(info->input2_name,optarg,sizeof(unsigned char)*strlen(optarg));
-    }
-    a++;
-   break;
-   
-   case 'n':
-    info->frame_number = atoi(optarg);
-    printf("-n %d\n",info->frame_number);
-   break;
+log.init = logSetting;
+log.init(&log,1);
 
-   case 'o':
-    info->output_name = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(optarg)+4+strlen("\0")));
-    sprintf(info->output_name,"%s.csv",optarg);
-    printf("-o %s\n",info->output_name);
-   break;
-   
-   case 'f':
-    if(strcmp("yuv",optarg)==0) info->format = 0;
-    else if(strcmp("tiff",optarg)==0) info->format = 1;
-    printf("format\n");
-   break;
-
-   case 's':
-    info->start_number = atoi(optarg);
-    printf("-s %d\n",atoi(optarg));
-   break;
-
-   case 'm':
-    printf("-m mode\n m=1:psnr only\n m=2:ssim only\n m=3 between psnr and ssim\n");
-    info->mode = atoi(optarg);
-    printf("mode:%d\n",info->mode);
-   break;
-
-   case 'p':
-    info->thread_number = atoi(optarg);
-    printf("therad number:%d\n",info->thread_number);
-   break;
- 
-   case 'v':
-    info->show_flag = atoi(optarg);
-    if(info->show_flag > 1){
-      info->show_flag=1;
-    }
-    printf("show:%d\n",info->show_flag);
-   break;
-  
-   case 'x':
-    info->ssim_mode = atoi(optarg);
-    if(info->ssim_mode>1) info->ssim_mode=1;
-    else if(info->ssim_mode<0) info->ssim_mode=0;
-    printf("ssim_mode%d\n",info->ssim_mode);
-   break;
-   
-  case 'W':
-    info->width = (unsigned int)atoi(optarg);
-    printf("width : %d\n",info->width);
-   break;
-   
-  case 'H':
-    info->height = (unsigned int)atoi(optarg);
-    printf("height : %d\n",info->height);
-   break;
-
-   case 'h':
-    printf("ganbarimasu\n");
-    exit(1);
-    break;
-
-   default:
-    printf("not option\n");
-    break;
-   
-  }
- }
- return 0; 
-}
 unsigned long getSize(FILE *fp){
  unsigned long size;
  fseek(fp,0,SEEK_END);
@@ -136,7 +33,11 @@ unsigned long getSize(FILE *fp){
  return size;
 }
 
-
+/**
+ * @brief 
+ * 
+ * @param info 
+ */
 void openyuvimg(optinfo *info){
 // FILE *before_file;
 // FILE *after_file;
@@ -148,36 +49,39 @@ void openyuvimg(optinfo *info){
  
  info->infile1 = fopen(info->input1_name,"rb");
  before_size = getSize(info->infile1);
-// before_img = (unsigned char*)malloc(sizeof(unsigned char)*(before_size));
-// ret = fread(before_img,before_size,1,before_file);
  free(info->input1_name);
 
  if((info->infile2=fopen(info->input2_name,"rb"))==NULL){
   perror("print error ");
   printf("after file read error\n");
-  fflush(stdout);
  }
 
  after_size = getSize(info->infile2);
-// after_img = (unsigned char*)malloc(sizeof(unsigned char)*(after_size));
-// ret = fread(after_img,after_size,1,after_file);
  free(info->input2_name);
 
- if(before_size != after_size) printf("you are fool\n"); 
+ if(before_size != after_size){
+   printf("you are fool\n"); 
+ }
+
  printf("before_size:%ld,after_size:%ld\n",before_size,after_size);
  printf("width:%d,height:%d\n",info->width,info->height);
+ 
  if(info->frame_number==0){
   info->frame_number= (before_size/(info->width*info->height*3))<<1;
   printf("info->frame_number:%d\n",info->frame_number);
  }
 
  printf("filep :%p\n",info->infile1);
-// info->input1_name = before_img;
-// info->input2_name = after_img;
-// fclose(before_file);
-// fclose(after_file);
 }
 
+
+/**
+ * @brief 
+ * 
+ * @param argc 
+ * @param argv 
+ * @return int 
+ */
 int main(int argc,char **argv){
  optinfo info;
  int i; 
@@ -186,37 +90,55 @@ int main(int argc,char **argv){
  unsigned char *name1;
  unsigned char *name2;
 
-  //printf("number of device:%d\n",acc_get_num_devices(acc_device_nvidia));
- if(argc<=3){
-  printf("Error\n");
-  printf("Usage:program.exe -i inputfile -i inputfile -f tiff\n");
-  fflush(stdout);
-  exit(1);  
+ //read config
+ if(setOption(argc,argv,&info)==-1){
+   log.errorLog("config Error");
+   exit(1);
  }
 
- if(setOption(argc,argv,&info)==-1) exit(1);
- fflush(stdout);
- 
- 
+ log.init(&log,info.loglevel);
 
- if(info.output_name==NULL){
+ if(info.output_name == NULL){
+  log.debugLog("Output CSV filename : NULL");
+
   name1 = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(info.input1_name)));
   name2 = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(info.input2_name)));
-  name1 = strstr(info.input1_name,"/")+1;
-  name2 = strstr(info.input2_name,"/")+1;
+  
+  name1 = strstr(info.input1_name,"/") + 1;
+  name2 = strstr(info.input2_name,"/") + 1;
+  
   info.output_name = (unsigned char*)malloc(sizeof(unsigned char)*(strlen(name1)+strlen(name2)+7));
-  sprintf(info.output_name,"%sand%s.csv",name1,name2);
-  if((info.outfile=fopen(info.output_name,"a"))==NULL) printf("EEOR\n");
-  fflush(stdout);
-  fprintf(info.outfile,"count,psnr,ssim,\n");
+    
   free(name1);
   free(name2);
  }
 
- if((info.outfile=fopen(info.output_name,"a"))==NULL) printf("ERROR\n");
- fflush(stdout);
+ if(AUTOMODE==info.format){
+
+ }
+ else if(YUVMODE==info.format){
+
+ }
+ else if(TIFFMODE==info.format){
+
+ }
+ else{
+
+   return;
+ }
+ 
+ sprintf(info.output_name,"%sand%s.csv",name1,name2);
+ log.infoLog("Output CSV filename : info.output_name");
+
+
+ if((info.outfile=fopen(info.output_name,"a"))==NULL){
+   log.errorLog("ERROR\n");
+ }
+
+ fprintf(info.outfile,"\n");
+ fprintf(info.outfile,"\n");
+
  if(info.mode==1){
-  printf("test.csv %p\n",info.outfile);
   fprintf(info.outfile,"count,psnr\n");
  }
  else if(info.mode ==2){
@@ -225,14 +147,26 @@ int main(int argc,char **argv){
  else if(info.mode ==3){
   fprintf(info.outfile,"count,psnr,ssim,\n");
  }
+ else{
+   log.errorLog("mode error");
+   return -1;
+ }
 
  pthread_t *pt;
  pthread_t tmp_pt;
 
- if(info.format == 0) openyuvimg(&info);
- else{
-  if(info.frame_number ==0) info.frame_number = 1;
+ if(VIDEOMODE== info.format){ 
+   openyuvimg();
  }
+ else if(YUVMODE == info.format){
+   openyuvimg(&info);
+ }
+ else if(TIFFMODE == info.format){
+  if(info.frame_number ==0) {
+    info.frame_number = 1;
+  }
+ }
+
  printf("filep :%p\n",info.infile1);
  
  if(info.frame_number < info.thread_number){
@@ -282,9 +216,14 @@ for(i=0;i<info.frame_number;i++){
  if(info.mode == 3) fprintf(info.outfile,"%d FRAME,%lf,%lf,\n",i,info.psnr_value[i],info.ssim_value[i]);
 }
 
-if(info.mode == 1 ||info.mode ==3) average_psnr = (info.psnr_value[info.frame_number]/info.frame_number);
-if(info.mode == 2 ||info.mode ==3) average_ssim = (info.ssim_value[info.frame_number]/info.frame_number);
-    
+if(info.mode == 1 ||info.mode ==3) {
+  average_psnr = (info.psnr_value[info.frame_number]/info.frame_number);
+}
+
+if(info.mode == 2 ||info.mode ==3) {
+  average_ssim = (info.ssim_value[info.frame_number]/info.frame_number);
+}
+
  fprintf(info.outfile,"\n");
  if(info.mode == 1 ||info.mode ==3){
   fprintf(info.outfile,"SUM(PSNR),%lf,\n",info.psnr_value[info.frame_number]);
