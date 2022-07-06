@@ -1,3 +1,6 @@
+#ifndef _LOG_H_
+#define _LOG_H_
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<time.h>
@@ -22,3 +25,5 @@ typedef struct Logger{
 }logger;
 
 void logSetting(logger *,unsigned int);
+
+#endif
